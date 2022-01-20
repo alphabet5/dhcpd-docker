@@ -2,7 +2,7 @@
 
 # if /reservations.yaml exists then run the python file to generate the dhcpd config.
 FILE=/*.yaml
-if test -f "$FILE"; then
+if test -f $FILE; then
     python3.9 /template-generation.py
 fi
 

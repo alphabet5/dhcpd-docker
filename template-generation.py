@@ -14,28 +14,30 @@ if __name__ == "__main__":
     else:
         template = r"""
 stash-agent-options true;
-{% for network in networks %}
-subnet {{ network['ip'] }} netmask {{ network['subnetmask'] }} {% raw %}{{% endraw %}
-  {% if subnet_options is not none +%}
-  {{ subnet_options }}
-  {% endif %}
-  option routers {{ network['gateway'] }};
-  option subnet-mask {{ network['subnetmask'] }};
-  option broadcast-address {{ network['broadcast'] }};
-{% raw %}}{% endraw %}
+{% if global_options is not none +%}
+{{ global_options }}
+{% endif %}
+  shared-network network {% raw %}{{% endraw %}
+    subnet 0.0.0.0 netmask 0.0.0.0 {} #this is required so dhcpd listens on the random-assigned docker interface address.
+    {% for network in networks %}
+    subnet {{ network['ip'] }} netmask {{ network['netmask'] }} {% raw %}{{% endraw %}
+      option routers {{ network['gateway'] }};
+      option subnet-mask {{ network['netmask'] }};
+      option broadcast-address {{ network['broadcast'] }};
+    {% raw %}}{% endraw %}
 {% endfor %}
-
+{% raw %}}{% endraw %}
 {% for client in clients %}
-host {{ client['circuit_id'] }} {% raw %}{{% endraw %}
+host {{ client['circuit_id_stripped'] }} {% raw %}{{% endraw %}
   host-identifier option agent.circuit-id "{{ client['circuit_id_raw'] }}";
   fixed-address {{ client['ip'] }};
 {% raw %}}{% endraw %}
 {% endfor %}
 """
-    if "subnet-options" in config.keys():
-        subnet_options = config["subnet-options"]
+    if "global-options" in config.keys():
+        global_options = config["global-options"]
     else:
-        subnet_options = None
+        global_options = None
     networks = []
     for vlan, cfg_network in config["networks"].items():
         network = dict()
@@ -55,6 +57,7 @@ host {{ client['circuit_id'] }} {% raw %}{{% endraw %}
         circuit_id, ip = item.split(",")
         client = dict()
         client["circuit_id"] = circuit_id
+        client["circuit_id_stripped"] = circuit_id.replace("/", "")
         client["ip"] = ip
         client["circuit_id_raw"] = (
             r"\x01\x" + hex(len(circuit_id)).replace("0x", "").zfill(2) + circuit_id
@@ -65,7 +68,7 @@ host {{ client['circuit_id'] }} {% raw %}{{% endraw %}
     with open("/etc/dhcp/dhcpd.conf", "w") as f:
         f.write(
             t.render(
-                subnet_options=subnet_options,
+                global_options=global_options,
                 clients=clients,
                 networks=networks,
             )
