@@ -144,18 +144,18 @@ template: | #Optional. This replace the whole config template and can cause erro
   {{ global_options }}
   {% endif %}
     shared-network network {% raw %}{{% endraw %}
-      subnet 0.0.0.0 netmask 0.0.0.0 {} #this is required so dhcpd listens on the random-assigned docker interface address.
       {% for network in networks %}
       subnet {{ network['ip'] }} netmask {{ network['netmask'] }} {% raw %}{{% endraw %}
         option routers {{ network['gateway'] }};
         option subnet-mask {{ network['netmask'] }};
         option broadcast-address {{ network['broadcast'] }};
       {% raw %}}{% endraw %}
-  {% endfor %}
+      {% endfor %}
+      subnet 0.0.0.0 netmask 0.0.0.0 {} #this is required so dhcpd listens on the random-assigned docker interface address.
   {% raw %}}{% endraw %}
   {% for client in clients %}
   host {{ client['circuit_id_stripped'] }} {% raw %}{{% endraw %}
-    host-identifier option agent.circuit-id "{{ client['circuit_id_raw'] }}";
+    host-identifier option agent.circuit-id "{{ client['circuit_id'] }}";
     fixed-address {{ client['ip'] }};
   {% raw %}}{% endraw %}
   {% endfor %}
@@ -251,3 +251,6 @@ optional arguments:
 - Updated the helper and template generation to default to 'circuit-id override string' instead of 'circuit-id string'
 - Added an option to bypass confirmation when using helper.py to configure switches.
 - Added interface shortening from FastEth->Fa.
+
+### 0.0.1-a3
+- Moved 0.0.0.0 subnet after the manually defined subnets so it's not matched first. This prevents clients from getting assigned to that range.

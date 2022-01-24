@@ -24,14 +24,14 @@ stash-agent-options true;
 {{ global_options }}
 {% endif %}
   shared-network network {% raw %}{{% endraw %}
-    subnet 0.0.0.0 netmask 0.0.0.0 {} #this is required so dhcpd listens on the random-assigned docker interface address.
     {% for network in networks %}
     subnet {{ network['ip'] }} netmask {{ network['netmask'] }} {% raw %}{{% endraw %}
       option routers {{ network['gateway'] }};
       option subnet-mask {{ network['netmask'] }};
       option broadcast-address {{ network['broadcast'] }};
     {% raw %}}{% endraw %}
-{% endfor %}
+    {% endfor %}
+    subnet 0.0.0.0 netmask 0.0.0.0 {} #this is required so dhcpd listens on the random-assigned docker interface address.
 {% raw %}}{% endraw %}
 {% for client in clients %}
 host {{ client['circuit_id_stripped'] }} {% raw %}{{% endraw %}
