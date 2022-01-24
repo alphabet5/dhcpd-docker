@@ -7,6 +7,28 @@ import re
 import os
 import argparse
 
+
+def short_name(interface):
+    names = [
+        ("GigabitEthernet", "Gi"),
+        ("TenGigabitEthernet", "Te"),
+        ("Ethernet", "Eth"),
+        ("FastEthernet", "Fa"),
+        ("FastEth", "Fa"),
+        ("Serial", "Ser"),
+        ("Port-channel", "Po"),
+        ("Cellular", "Ce"),
+        ("NVI", "NV"),
+        ("Tunnel", "Tu"),
+        ("Vlan", "Vl"),
+    ]
+    out = interface
+    for change in names:
+        long_name, short_name = change
+        out = out.replace(long_name, short_name)
+    return out
+
+
 if __name__ == "__main__":
     install(show_locals=True)
     console = Console()
@@ -71,6 +93,13 @@ Currently only Cisco IOS is supported.
         type=str,
         default="/switch_list.txt",
     )
+    parser.add_argument(
+        "--no-confirm",
+        help="Optional: Commit configs without prompting for confirmation.",
+        default=False,
+        action="store_true",
+    )
+
     args = vars(parser.parse_args())
     if args["configure"] or args["export_clients"]:
         with open(args["sw_list"], "r") as f:
@@ -83,7 +112,7 @@ Currently only Cisco IOS is supported.
             password = os.environ["SW_PASS"]
         else:
             password = args["sw_pass"]
-        if args["export-clients"]:
+        if args["export_clients"]:
             console.print("Currently not implemented. :( Pull requests welcome. :)")
         if args["configure"]:
             for switch in switches:
@@ -100,9 +129,13 @@ ip dhcp snooping vlan 1-4094
                     "hostname ", ""
                 )
                 interfaces_raw = parse.find_objects(r"^interface")
-                interfaces = list()
+                interfaces = dict()
                 interface_config_remove = dict()
                 for interface in interfaces_raw:
+                    cononical = canonical_interface_name(
+                        interface.text.replace("interface ", "")
+                    )
+                    cfg = "interface " + cononical + "\n"
                     if "vlan" not in interface.text.lower():
                         if " switchport mode access" in [
                             c.text for c in interface.children
@@ -113,42 +146,59 @@ ip dhcp snooping vlan 1-4094
                                     vlan = re.match(
                                         r".*vlan (\d+).*", child.text
                                     ).group(1)
+                            if "vlan" in locals():
+                                snooping_cfg = (
+                                    " ip dhcp snooping vlan "
+                                    + vlan
+                                    + " information option format-type circuit-id override string "
+                                    + hostname
+                                    + short_name(cononical)
+                                    + "\n"
+                                )
+                            else:
+                                snooping_cfg = (
+                                    " ip dhcp snooping vlan 1 information option format-type circuit-id override string "
+                                    + hostname
+                                    + short_name(cononical)
+                                    + "\n"
+                                )
+                                cfg = (
+                                    cfg
+                                    + " ip dhcp snooping vlan "
+                                    + vlan
+                                    + " information option format-type circuit-id string "
+                                    + hostname
+                                    + short_name(cononical)
+                                    + "\n"
+                                )
+                            cfg = cfg + snooping_cfg
+                            for child in interface.children:
                                 if "ip dhcp snooping vlan" in child.text:
-                                    snooping_vlans.append(
-                                        re.match(r".*vlan (\d+).*", child.text).group(1)
-                                    )
-                            if [vlan] != snooping_vlans:
-                                snooping_vlans.remove(vlan)
-                                interface_config_remove[interface.text] = list()
-                                for vlan_to_remove_circuit_id in snooping_vlans:
-                                    interface_config_remove[interface.text].append(
-                                        "no ip dhcp snooping vlan "
-                                        + vlan_to_remove_circuit_id
-                                        + " information option"
-                                    )
-
-                        interfaces.append(
-                            canonical_interface_name(
-                                interface.text.replace("interface ", "")
-                            )
-                        )
-
-                for interface in interfaces:
-                    cfg = (
-                        cfg
-                        + f"""
-interface {interface}
-ip dhcp snooping vlan 2 information option format-type circuit-id string switch01Gi1/0/3
-"""
-                    )
-                    if interface in interface_config_remove:
-                        cfg = cfg + "\n" + "\n".join(interface_config_remove[interface])
+                                    vlan = re.match(
+                                        r".*vlan (\d+).*", child.text
+                                    ).group(1)
+                                    circuit_id = re.match(
+                                        r".*circuit-id.*string (.+)", child.text
+                                    ).group(1)
+                                    if (
+                                        vlan != vlan
+                                        or circuit_id
+                                        != hostname + short_name(cononical)
+                                    ):
+                                        cfg = cfg + " no " + child.text + "\n"
+                            interfaces[cononical] = cfg
+                cfg = ""
+                for interface, int_cfg in interfaces.items():
+                    cfg = cfg + int_cfg + "\n"
                 device.load_merge_candidate(config=cfg)
                 console.print(device.compare_config())
-                accept = console.input(
-                    "Accept config merge for " + switch + "? (y/n) [n]"
-                )
-                if accept.lower() in ["y", "ye", "yes"]:
+                if args["no_confirm"]:
                     device.commit_config()
                 else:
-                    device.discard_config()
+                    accept = console.input(
+                        "Accept config merge for " + switch + "? (y/n) [n]"
+                    )
+                    if accept.lower() in ["y", "ye", "yes"]:
+                        device.commit_config()
+                    else:
+                        device.discard_config()

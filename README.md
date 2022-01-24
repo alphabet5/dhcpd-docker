@@ -15,7 +15,9 @@ This container is used as a dhcp server for port-persistent DHCP on Cisco Catlys
   sw02Gi1/0/1,192.168.2.123
   ```
 - A core switch with valid IP addresses in each network for each vlan that needs dhcp.
+- IP dhcp snooping enabled.
 - Docker
+- Unique hostnames (if using the helper). Otherwise unique client-ids.
 
 ### Example Core Switch Configuration:
 
@@ -65,35 +67,6 @@ interface GigabitEthernet1/0/47
  ip dhcp snooping trust
 end
 ```
-##### End Device Interfaces
-
-```text
-!
-interface GigabitEthernet1/0/2
- switchport access vlan 2
- switchport mode access
- spanning-tree portfast edge
- spanning-tree bpduguard enable
- ip dhcp snooping vlan 2 information option format-type circuit-id string prsw01Gi1/0/2
-end
-!
-interface GigabitEthernet1/0/3
- switchport access vlan 3
- switchport mode access
- shutdown
- spanning-tree portfast edge
- spanning-tree bpduguard enable
- ip dhcp snooping vlan 3 information option format-type circuit-id string prsw01Gi1/0/3
-end
-!
-interface GigabitEthernet1/0/4
- switchport access vlan 4
- switchport mode access
- spanning-tree portfast edge
- spanning-tree bpduguard enable
- ip dhcp snooping vlan 4 information option format-type circuit-id string prsw01Gi1/0/4
-end
-```
 
 #### Layer 2 Access Switch Configuration
 
@@ -104,12 +77,18 @@ ip dhcp snooping
 
 ```text
 !
+interface GigabitEthernet1/0/1
+ switchport mode trunk
+ switchport trunk native vlan 999
+ ip dhcp snooping trust
+end
+!
 interface GigabitEthernet1/0/2
  switchport access vlan 2
  switchport mode access
  spanning-tree portfast edge
  spanning-tree bpduguard enable
- ip dhcp snooping vlan 2 information option format-type circuit-id string prsw02Gi1/0/2
+ ip dhcp snooping vlan 2 information option format-type circuit-id override string prsw02Gi1/0/2
 end
 !
 interface GigabitEthernet1/0/3
@@ -117,7 +96,7 @@ interface GigabitEthernet1/0/3
  switchport mode access
  spanning-tree portfast edge
  spanning-tree bpduguard enable
- ip dhcp snooping vlan 3 information option format-type circuit-id string prsw02Gi1/0/3
+ ip dhcp snooping vlan 3 information option format-type circuit-id override string prsw02Gi1/0/3
 end
 !
 interface GigabitEthernet1/0/4
@@ -125,7 +104,7 @@ interface GigabitEthernet1/0/4
  switchport mode access
  spanning-tree portfast edge
  spanning-tree bpduguard enable
- ip dhcp snooping vlan 4 information option format-type circuit-id string prsw02Gi1/0/4
+ ip dhcp snooping vlan 4 information option format-type circuit-id override string prsw02Gi1/0/4
 end
 ```
 
@@ -267,3 +246,8 @@ optional arguments:
 - Basic testing has passed.
 - Applied black formatting to helper.py
 
+### 0.0.1-a2
+- Fixed the helper configure command.
+- Updated the helper and template generation to default to 'circuit-id override string' instead of 'circuit-id string'
+- Added an option to bypass confirmation when using helper.py to configure switches.
+- Added interface shortening from FastEth->Fa.

@@ -1,10 +1,16 @@
 from jinja2 import Template
+from rich.traceback import install
+from rich.console import Console
 import yaml
 import ipaddress
 import glob
+import os
 
 
 if __name__ == "__main__":
+    install(show_locals=True)
+    console = Console()
+
     path = "/*.yaml"
     for filename in glob.glob(path):
         with open(filename, "r") as f:
@@ -29,7 +35,7 @@ stash-agent-options true;
 {% raw %}}{% endraw %}
 {% for client in clients %}
 host {{ client['circuit_id_stripped'] }} {% raw %}{{% endraw %}
-  host-identifier option agent.circuit-id "{{ client['circuit_id_raw'] }}";
+  host-identifier option agent.circuit-id "{{ client['circuit_id'] }}";
   fixed-address {{ client['ip'] }};
 {% raw %}}{% endraw %}
 {% endfor %}
@@ -59,9 +65,6 @@ host {{ client['circuit_id_stripped'] }} {% raw %}{{% endraw %}
         client["circuit_id"] = circuit_id
         client["circuit_id_stripped"] = circuit_id.replace("/", "")
         client["ip"] = ip
-        client["circuit_id_raw"] = (
-            r"\x01\x" + hex(len(circuit_id)).replace("0x", "").zfill(2) + circuit_id
-        )
         clients.append(client)
     t = Template(template)
 
