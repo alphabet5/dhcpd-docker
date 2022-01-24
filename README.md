@@ -118,7 +118,7 @@ global-options: | #Optional, gets added before the subnet config.
   max-lease-time -1;
   option domain-name-servers 192.168.1.1, 1.1.1.1;
   option domain-name "domain.com";
-  option tftp-server-name "192.168.1.250";
+  next-server "192.168.1.250";
   option bootfile-name "tmboot64.bin";
 networks:
 # vlan: gateway/subnet
